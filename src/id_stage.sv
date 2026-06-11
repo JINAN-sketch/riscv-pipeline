@@ -36,7 +36,10 @@ module id_stage
     output logic [4:0]  rd_addr,
 
     // JAL target (computable here in ID)
-    output logic [31:0] jal_target
+    output logic [31:0] jal_target,
+
+    // Packed struct output — drives ID/EX register directly
+    output id_ex_t      id_ex_d
 );
 
     // Extract register addresses from instruction
@@ -87,5 +90,25 @@ module id_stage
     // Note: this is only valid when imm_sel = J-type (JAL opcode).
     // The IF stage only uses jal_target when pc_sel = 2'b10,
     // which the hazard unit sets only on a JAL instruction.
+
+    // ── Pack outputs into ID/EX struct ───────────────────────────
+    assign id_ex_d.reg_write = reg_write;
+    assign id_ex_d.alu_src   = alu_src;
+    assign id_ex_d.alu_op    = alu_op;
+    assign id_ex_d.alu_pc    = alu_pc;
+    assign id_ex_d.mem_write = mem_write;
+    assign id_ex_d.mem_read  = mem_read;
+    assign id_ex_d.mem_width = mem_width;
+    assign id_ex_d.wb_sel    = wb_sel;
+    assign id_ex_d.branch    = branch;
+    assign id_ex_d.jump      = jump;
+    assign id_ex_d.pc        = if_id.pc;
+    assign id_ex_d.pc_plus4  = if_id.pc_plus4;
+    assign id_ex_d.rs1_data  = rs1_data;
+    assign id_ex_d.rs2_data  = rs2_data;
+    assign id_ex_d.imm       = imm;
+    assign id_ex_d.rs1_addr  = rs1_addr;
+    assign id_ex_d.rs2_addr  = rs2_addr;
+    assign id_ex_d.rd_addr   = rd_addr;
 
 endmodule

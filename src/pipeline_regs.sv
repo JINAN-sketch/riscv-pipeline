@@ -14,6 +14,33 @@ package pipeline_pkg;
         logic [31:0] pc_plus4; //pc+4 or for link address
         logic [31:0] instr; //raw 32 bit instr
     } if_id_t;
+
+    // ID/EX payload — travels from Decode to Execute
+    typedef struct packed {
+        // Control signals
+        logic        reg_write;
+        logic        alu_src;
+        logic [3:0]  alu_op;
+        logic        alu_pc;
+        logic        mem_write;
+        logic        mem_read;
+        logic [2:0]  mem_width;
+        logic [1:0]  wb_sel;
+        logic        branch;
+        logic        jump;
+
+        // Data
+        logic [31:0] pc;
+        logic [31:0] pc_plus4;
+        logic [31:0] rs1_data;
+        logic [31:0] rs2_data;
+        logic [31:0] imm;
+
+        // Register addresses (needed by forwarding unit in Week 3)
+        logic [4:0]  rs1_addr;
+        logic [4:0]  rs2_addr;
+        logic [4:0]  rd_addr;
+    } id_ex_t;
 endpackage
 
 // ================================================================
@@ -46,4 +73,28 @@ module if_id_reg(
         end
         //else: hold/stall, dont flush or write
     end
+endmodule
+
+
+
+// ================================================================
+// ID/EX pipeline register
+// ================================================================
+module id_ex_reg (
+    input  logic    clk,
+    input  logic    rst,
+    input  logic    flush,    // 1 = insert bubble (branch/load-use)
+    input  id_ex_t  d,
+    output id_ex_t  q
+);
+
+    always_ff @(posedge clk) begin
+        if (rst || flush) begin
+            // Zero everything — all control signals go to safe 0
+            q <= '0;
+        end else begin
+            q <= d;
+        end
+    end
+
 endmodule
