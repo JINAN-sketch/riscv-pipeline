@@ -41,6 +41,39 @@ package pipeline_pkg;
         logic [4:0]  rs2_addr;
         logic [4:0]  rd_addr;
     } id_ex_t;
+
+    // EX/MEM payload — travels from Execute to Memory
+    typedef struct packed {
+        // Control signals
+        logic        reg_write;
+        logic        mem_write;
+        logic        mem_read;
+        logic [2:0]  mem_width;
+        logic [1:0]  wb_sel;
+
+        // Data
+        logic [31:0] alu_result;    // memory address for loads/stores
+        logic [31:0] rs2_data;      // data to write for stores
+        logic [31:0] pc_plus4;      // link address for JAL/JALR
+
+        // Destination register
+        logic [4:0]  rd_addr;
+    } ex_mem_t;
+
+    // MEM/WB payload — travels from Memory to Writeback
+    typedef struct packed {
+        // Control signals
+        logic        reg_write;
+        logic [1:0]  wb_sel;
+
+        // Data
+        logic [31:0] alu_result;    // ALU result (for non-load instructions)
+        logic [31:0] mem_data;      // data read from memory (for loads)
+        logic [31:0] pc_plus4;      // link address for JAL/JALR
+
+        // Destination register
+        logic [4:0]  rd_addr;
+    } mem_wb_t;
 endpackage
 
 // ================================================================
@@ -48,9 +81,9 @@ endpackage
 // ================================================================
 
 
-import pipeline_pkg::*;
-
-module if_id_reg(
+module if_id_reg
+    import pipeline_pkg::*;
+(
     input logic clk,
     input logic rst,
     input logic if_id_write, // 1 means latch nirmally, 0 means stall
@@ -80,7 +113,9 @@ endmodule
 // ================================================================
 // ID/EX pipeline register
 // ================================================================
-module id_ex_reg (
+module id_ex_reg 
+    import pipeline_pkg::*;
+(
     input  logic    clk,
     input  logic    rst,
     input  logic    flush,    // 1 = insert bubble (branch/load-use)
@@ -97,4 +132,41 @@ module id_ex_reg (
         end
     end
 
+endmodule
+
+// ================================================================
+// EX/MEM pipeline register
+// ================================================================
+module ex_mem_reg 
+    import pipeline_pkg::*;
+(
+    input  logic    clk,
+    input  logic    rst,
+    input  logic    flush,
+    input  ex_mem_t d,
+    output ex_mem_t q
+);
+    always_ff @(posedge clk) begin
+        if (rst || flush)  q <= '0;
+        else               q <= d;
+    end
+endmodule
+
+
+// ================================================================
+// MEM/WB pipeline register
+// ================================================================
+module mem_wb_reg 
+    import pipeline_pkg::*;
+(
+    input  logic    clk,
+    input  logic    rst,
+    input  mem_wb_t d,
+    output mem_wb_t q
+);
+    // No flush on MEM/WB — by this point the instruction has committed
+    always_ff @(posedge clk) begin
+        if (rst)  q <= '0;
+        else      q <= d;
+    end
 endmodule
