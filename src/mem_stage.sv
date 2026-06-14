@@ -48,14 +48,7 @@ module mem_stage
 
     // Synchronous read
     logic [31:0] raw_mem_data;
-    always_ff @(posedge clk) begin
-        if (rst)
-            raw_mem_data <= 32'h0;
-        else if (ex_mem.mem_read)
-            raw_mem_data <= dmem[ex_mem.alu_result[9:2]];
-        else
-            raw_mem_data <= 32'h0;
-    end
+    assign raw_mem_data = dmem[ex_mem.alu_result[9:2]];
 
     // ── Load width + sign/zero extension ─────────────────────────
     // Applied combinationally to raw_mem_data after the synchronous read

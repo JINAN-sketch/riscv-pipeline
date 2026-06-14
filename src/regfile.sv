@@ -7,8 +7,8 @@ module regfile(
     //read ports(combinational)
     input logic [4:0] rs1,
     input logic [4:0] rs2,
-    input logic [31:0] rs1_data,
-    input logic [31:0] rs2_data,
+    output logic [31:0] rs1_data,
+    output logic [31:0] rs2_data,
 
     //write port(synchronous/posedge clk)
     input logic [4:0] rd,
@@ -16,6 +16,11 @@ module regfile(
     input logic reg_write
 );
     logic [31:0] regs[0:31]; // 32 registers, each of 32 bit
+    integer j;
+    initial begin
+        for (j = 0; j < 32; j = j + 1)
+            regs[j] = 32'h0;
+    end
 
     // ── Synchronous write ────────────────────────────────────────
     // x0 is hardwired to zero — never written
