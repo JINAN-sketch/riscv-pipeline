@@ -35,8 +35,11 @@ module if_stage #(
     logic [31:0] pc_reg;
     logic [31:0] pc_plus4;
     logic [31:0] pc_next;
-    // ── PC+4 (combinational) ──────────────────────────────────────
-    assign pc_plus4 = pc_reg +32'd4;
+    logic [31:0] pc_reg_d;   // delayed by 1 cycle to match instr_mem's read latency
+
+    // ── PC+4 (combinational, drives the live next-PC mux) ────────
+    assign pc_plus4 = pc_reg + 32'd4;
+
     // ── Next-PC mux (combinational) ──────────────────────────────
     always_comb begin
         case (pc_sel)
@@ -50,22 +53,34 @@ module if_stage #(
 
     // ── PC register (sequential) ─────────────────────────────────
     always_ff @(posedge clk) begin
-        if (rst)       pc_reg <= 32'h0000_0000;
-        else if (pc_write) pc_reg <= pc_next;
+        if (rst)            pc_reg <= 32'h0000_0000;
+        else if (pc_write)  pc_reg <= pc_next;
         // else: hold — stall
+    end
+
+    // ── Delayed PC register — tags the instruction correctly ─────
+    // instr_mem has 1-cycle read latency, so the instruction appearing
+    // in instr_out this cycle was fetched using LAST cycle's pc_reg.
+    // pc_reg_d captures that so IF/ID tags the instruction with its
+    // true fetch address, not the current (already-advanced) PC.
+    always_ff @(posedge clk) begin
+        if (rst)            pc_reg_d <= 32'h0000_0000;
+        else if (pc_write)  pc_reg_d <= pc_reg;
+        // else: hold — stall (stays in sync with instr_mem's freeze)
     end
 
     // ── Instruction memory ───────────────────────────────────────
     instr_mem #(.MEM_FILE(MEM_FILE)) u_imem (
-        .clk   (clk),
-        .rst   (rst),
-        .addr  (pc_reg),
-        .instr (instr_out)
+        .clk    (clk),
+        .rst    (rst),
+        .freeze (!pc_write),
+        .addr   (pc_reg),
+        .instr  (instr_out)
     );
 
     // ── Outputs ──────────────────────────────────────────────────
-    assign pc_out       = pc_reg;
-    assign pc_plus4_out = pc_plus4;
+    assign pc_out       = pc_reg_d;          // matches instr_out's true fetch address
+    assign pc_plus4_out = pc_reg_d + 32'd4;  // pc+4 of the instruction being tagged
     // instr_out comes directly from u_imem
 
 endmodule

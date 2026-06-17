@@ -41,7 +41,7 @@ module hazard_unit (
             pc_write    = 1'b1;
             if_id_write = 1'b1;
             if_id_flush = 1'b1;
-            id_ex_flush = 1'b0;
+            id_ex_flush = 1'b1;
         end else begin
             // Normal operation
             pc_write    = 1'b1;

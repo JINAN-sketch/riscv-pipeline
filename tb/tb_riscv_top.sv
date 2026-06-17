@@ -37,29 +37,36 @@ module tb_riscv_top;
         #1;
 
         $display("\n--- Register file check ---");
-        check_reg(1, 32'd10,  "x1  ADDI 10");
-        check_reg(2, 32'd20,  "x2  ADDI 20");
-        check_reg(3, 32'd30,  "x3  ADD  x1+x2");
-        check_reg(4, 32'd5,   "x4  ADDI 5");
-        check_reg(5, 32'd25,  "x5  SUB  x3-x4");
-        check_reg(6, 32'd30,  "x6  LW   mem[0]");
+        check_reg(1, 32'd10, "x1  ADDI 10");
+        check_reg(2, 32'd20, "x2  ADDI 20");
+        check_reg(3, 32'd30, "x3  ADD  x1+x2");
+        check_reg(4, 32'd20, "x4  SUB  x3-x1");
+        check_reg(5, 32'd30, "x5  LW   mem[0]");
+        check_reg(6, 32'd50, "x6  ADD  x5+x4");
+        check_reg(7, 32'd0,  "x7  SKIPPED (branch taken)");
+        check_reg(8, 32'd7,  "x8  ADDI 7 (branch target)");
 
         $display("\n--- done ---");
         $finish;
     end
 
-    // Cycle monitor
+    // Cycle monitor — PC/instruction phase-alignment tracer
     integer cycle = 0;
     always @(posedge clk) begin
-    #1;
-    cycle <= cycle + 1;
-    $display("cyc=%0d | mem_wb: wb_sel=%02b mem_data=%08h alu=%08h wb_data=%08h rd=x%0d",
-    cycle,
-    u_top.mem_wb_q.wb_sel,
-    u_top.mem_wb_q.mem_data,
-    u_top.mem_wb_q.alu_result,
-    u_top.wb_data,
-    u_top.mem_wb_q.rd_addr);
+        #1;
+        cycle <= cycle + 1;
+        $display("c%0d | pc_reg=%08h instr_out=%08h || if_id.pc=%08h if_id.instr=%08h || id_ex.pc=%08h id_ex.imm=%08h id_ex.branch=%b || br_target=%08h brTkn=%b",
+            cycle,
+            u_top.if_pc_out,        // pc_reg as currently wired (pc_out)
+            u_top.if_instr_out,     // instruction coming out of instr_mem this cycle
+            u_top.if_id_q.instr,    // what IF/ID actually latched
+            u_top.if_id_q.pc,       // the PC tag IF/ID latched alongside it
+            u_top.id_ex_q.pc,       // PC tag after ID/EX latches it
+            u_top.id_ex_q.imm,
+            u_top.id_ex_q.branch,
+            u_top.ex_branch_target,
+            u_top.ex_branch_taken);
     end
+    
 
 endmodule

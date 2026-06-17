@@ -9,6 +9,7 @@ module instr_mem #(
 )(
     input logic clk,
     input logic rst,
+    input  logic        freeze,
     input logic [31:0] addr,  //byte addressed with 256 words so we only use [9:2]
     output logic [31:0] instr
 );
@@ -17,11 +18,10 @@ module instr_mem #(
     initial $readmemh(MEM_FILE, mem);
 
     always_ff @(posedge clk) begin
-       if(rst) begin
-            instr <= 32'h0000_0013; //NOP on reset
-       end 
-       else begin
-            instr <= mem[addr[9:2]];
-       end
+    if (rst)
+        instr <= 32'h0000_0013;   // NOP on reset
+    else if (!freeze)
+        instr <= mem[addr[9:2]];  // only advance when not frozen
+    // else: hold current instr during stall
     end
 endmodule
