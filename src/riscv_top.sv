@@ -8,6 +8,7 @@ module riscv_top
     input logic clk,
     input logic rst
 );
+    
 
     // ── IF stage outputs ─────────────────────────────────────────
     logic [31:0] if_pc_out, if_pc_plus4_out, if_instr_out;
@@ -59,10 +60,27 @@ module riscv_top
     logic        wb_reg_write;
 
     // ── Forwarding (tied off — Week 3) ───────────────────────────
-    logic [1:0]  fwd_a = 2'b00;
-    logic [1:0]  fwd_b = 2'b00;
-    logic [31:0] fwd_mem_result = 32'h0;
-    logic [31:0] fwd_wb_result  = 32'h0;
+    // logic [1:0]  fwd_a = 2'b00;
+    // logic [1:0]  fwd_b = 2'b00;
+    // logic [31:0] fwd_mem_result = 32'h0;
+    // logic [31:0] fwd_wb_result  = 32'h0;
+
+    //week 3 -> forwarding
+    logic [1:0] fwd_a, fwd_b;
+
+    forwarding_unit u_fwd (
+        .id_ex_rs1_addr   (id_ex_q.rs1_addr),
+        .id_ex_rs2_addr   (id_ex_q.rs2_addr),
+        .ex_mem_rd_addr   (ex_mem_q.rd_addr),
+        .ex_mem_reg_write (ex_mem_q.reg_write),
+        .mem_wb_rd_addr   (mem_wb_q.rd_addr),
+        .mem_wb_reg_write (mem_wb_q.reg_write),
+        .fwd_a            (fwd_a),
+        .fwd_b            (fwd_b)
+    );
+    logic [31:0] fwd_mem_result, fwd_wb_result;
+    assign fwd_mem_result = ex_mem_q.alu_result;   // EX/MEM forward value
+    assign fwd_wb_result   = wb_data;               // MEM/WB forward value (use wb_data, already muxed)
 
     // ── Hazard / PC control ──────────────────────────────────────
     // Basic branch/jump redirect — no stall yet
@@ -72,10 +90,20 @@ module riscv_top
                          (id_ex_q.jump &&  id_ex_q.alu_src) ? 2'b11 :  // JALR
                          2'b00;                                 // sequential
 
-    assign if_id_flush = (ex_branch_taken) ? 1'b1 : 1'b0;
-    assign if_id_write = 1'b1;
-    assign id_ex_flush = 1'b0;
     assign ex_mem_flush = 1'b0;
+    logic pc_write, if_id_write, if_id_flush, id_ex_flush;
+
+    hazard_unit u_hazard (
+        .id_ex_mem_read  (id_ex_q.mem_read),
+        .id_ex_rd_addr   (id_ex_q.rd_addr),
+        .if_id_rs1_addr  (if_id_q.instr[19:15]),
+        .if_id_rs2_addr  (if_id_q.instr[24:20]),
+        .branch_taken    (ex_branch_taken),
+        .pc_write        (pc_write),
+        .if_id_write     (if_id_write),
+        .if_id_flush     (if_id_flush),
+        .id_ex_flush     (id_ex_flush)
+    );
 
     // ── Pack EX outputs into EX/MEM struct ───────────────────────
     assign ex_mem_d.reg_write  = ex_reg_write;
@@ -108,7 +136,7 @@ module riscv_top
     if_stage #(.MEM_FILE(MEM_FILE)) u_if (
         .clk           (clk),
         .rst           (rst),
-        .pc_write      (1'b1),
+        .pc_write      (pc_write),
         .pc_sel        (pc_sel),
         .branch_target (ex_branch_target),
         .jal_target    (id_jal_target),

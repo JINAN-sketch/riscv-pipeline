@@ -38,6 +38,11 @@ module regfile(
     // ── Asynchronous read ────────────────────────────────────────
     // x0 always reads as zero regardless of what is stored
 
-    assign rs1_data = (rs1 == 5'b0) ? 32'h0 : regs[rs1];
-    assign rs2_data = (rs2 == 5'b0) ? 32'h0 : regs[rs2];
+    assign rs1_data = (rs1 == 5'b0) ? 32'h0 :
+                   (reg_write && rd == rs1 && rd != 5'b0) ? rd_data :
+                   regs[rs1];
+
+    assign rs2_data = (rs2 == 5'b0) ? 32'h0 :
+                    (reg_write && rd == rs2 && rd != 5'b0) ? rd_data :
+                    regs[rs2];
 endmodule
