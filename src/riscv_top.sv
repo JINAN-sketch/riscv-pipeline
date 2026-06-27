@@ -59,6 +59,12 @@ module riscv_top
     logic [4:0]  wb_rd;
     logic        wb_reg_write;
 
+    // ── MAC unit MMIO wires ──────────────────────────────────────
+    logic [1:0]  mac_addr;
+    logic [31:0] mac_wdata;
+    logic        mac_we;
+    logic [31:0] mac_rdata;
+
     // ── Forwarding (tied off — Week 3) ───────────────────────────
     // logic [1:0]  fwd_a = 2'b00;
     // logic [1:0]  fwd_b = 2'b00;
@@ -223,12 +229,25 @@ module riscv_top
         .clk            (clk),
         .rst            (rst),
         .ex_mem         (ex_mem_q),
+        .mac_addr       (mac_addr),
+        .mac_wdata      (mac_wdata),
+        .mac_we         (mac_we),
+        .mac_rdata      (mac_rdata),
         .mem_data_out   (mem_data_out),
         .alu_result_out (mem_alu_result_out),
         .pc_plus4_out   (mem_pc_plus4_out),
         .reg_write_out  (mem_reg_write_out),
         .wb_sel_out     (mem_wb_sel_out),
         .rd_addr_out    (mem_rd_addr_out)
+);
+
+    mac_unit u_mac (
+        .clk   (clk),
+        .rst   (rst),
+        .addr  (mac_addr),
+        .wdata (mac_wdata),
+        .we    (mac_we),
+        .rdata (mac_rdata)
     );
 
     mem_wb_reg u_mem_wb (

@@ -5,60 +5,68 @@ module mem_stage
 (
     input  logic        clk,
     input  logic        rst,
-
-    // From EX/MEM register
     input  ex_mem_t     ex_mem,
 
+    // MAC unit MMIO interface
+    output logic [1:0]  mac_addr,
+    output logic [31:0] mac_wdata,
+    output logic        mac_we,
+    input  logic [31:0] mac_rdata,
+
     // Outputs to MEM/WB register
-    output logic [31:0] mem_data_out,   // loaded data (sign/zero extended)
-    output logic [31:0] alu_result_out, // pass-through ALU result
-    output logic [31:0] pc_plus4_out,   // pass-through link address
+    output logic [31:0] mem_data_out,
+    output logic [31:0] alu_result_out,
+    output logic [31:0] pc_plus4_out,
     output logic        reg_write_out,
     output logic [1:0]  wb_sel_out,
     output logic [4:0]  rd_addr_out
 );
 
-    // ── Data memory — 256 words × 32 bits ───────────────────────
+    // ── Data memory ──────────────────────────────────────────────
     logic [31:0] dmem [0:255];
 
-    // Synchronous write
-    logic [31:0] dmem_wdata;
-    logic [7:0]  dmem_waddr;
+    // ── MMIO address decode ──────────────────────────────────────
+    logic is_mmio;
+    assign is_mmio = (ex_mem.alu_result >= 32'h400);
 
+    // ── MAC unit wiring ──────────────────────────────────────────
+    assign mac_addr  = ex_mem.alu_result[3:2];
+    assign mac_wdata = ex_mem.rs2_data;
+    assign mac_we    = ex_mem.mem_write && is_mmio;
+
+    // ── Combinational read ───────────────────────────────────────
+    logic [31:0] raw_mem_data;
+    assign raw_mem_data = is_mmio ? mac_rdata : dmem[ex_mem.alu_result[9:2]];
+
+    // ── Synchronous write (dmem only) ────────────────────────────
+    logic [31:0] dmem_wdata;
     always_ff @(posedge clk) begin
-        if (ex_mem.mem_write) begin
-            dmem_waddr = ex_mem.alu_result[9:2];
+        if (ex_mem.mem_write && !is_mmio) begin
             case (ex_mem.mem_width)
-                3'b000: begin  // SB
-                    dmem_wdata        = dmem[dmem_waddr];
-                    dmem_wdata[7:0]   = ex_mem.rs2_data[7:0];
-                    dmem[dmem_waddr] <= dmem_wdata;
+                3'b000: begin
+                    dmem_wdata       = dmem[ex_mem.alu_result[9:2]];
+                    dmem_wdata[7:0]  = ex_mem.rs2_data[7:0];
+                    dmem[ex_mem.alu_result[9:2]] <= dmem_wdata;
                 end
-                3'b001: begin  // SH
-                    dmem_wdata        = dmem[dmem_waddr];
+                3'b001: begin
+                    dmem_wdata        = dmem[ex_mem.alu_result[9:2]];
                     dmem_wdata[15:0]  = ex_mem.rs2_data[15:0];
-                    dmem[dmem_waddr] <= dmem_wdata;
+                    dmem[ex_mem.alu_result[9:2]] <= dmem_wdata;
                 end
-                3'b010: // SW
-                    dmem[dmem_waddr] <= ex_mem.rs2_data;
-                default: ;
+                default:
+                    dmem[ex_mem.alu_result[9:2]] <= ex_mem.rs2_data;
             endcase
         end
     end
 
-    // Synchronous read
-    logic [31:0] raw_mem_data;
-    assign raw_mem_data = dmem[ex_mem.alu_result[9:2]];
-
-    // ── Load width + sign/zero extension ─────────────────────────
-    // Applied combinationally to raw_mem_data after the synchronous read
+    // ── Load sign/zero extension ─────────────────────────────────
     always_comb begin
         case (ex_mem.mem_width)
-            3'b000: mem_data_out = {{24{raw_mem_data[7]}},  raw_mem_data[7:0]};   // LB
-            3'b001: mem_data_out = {{16{raw_mem_data[15]}}, raw_mem_data[15:0]};  // LH
-            3'b010: mem_data_out = raw_mem_data;                                   // LW
-            3'b100: mem_data_out = {24'h0, raw_mem_data[7:0]};                    // LBU
-            3'b101: mem_data_out = {16'h0, raw_mem_data[15:0]};                   // LHU
+            3'b000:  mem_data_out = {{24{raw_mem_data[7]}},  raw_mem_data[7:0]};
+            3'b001:  mem_data_out = {{16{raw_mem_data[15]}}, raw_mem_data[15:0]};
+            3'b010:  mem_data_out = raw_mem_data;
+            3'b100:  mem_data_out = {24'h0, raw_mem_data[7:0]};
+            3'b101:  mem_data_out = {16'h0, raw_mem_data[15:0]};
             default: mem_data_out = raw_mem_data;
         endcase
     end
